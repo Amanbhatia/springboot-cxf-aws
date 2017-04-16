@@ -1,0 +1,469 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS CloudFormation Sample Template ElasticBeanstalk_Simple: Configure and launch an AWS Elastic Beanstalk application that connects to an Amazon RDS database instance. Monitoring is setup on the database. **WARNING** This template creates one or more Amazon EC2 instances and an Amazon Relational Database Service database instance. You will be billed for the AWS resources used if you create a stack from this template.",
+  "Parameters": {
+    "AppS3Bucket": {
+      "Type": "String",
+      "Description": "S3 Bucket for the springboot artifact",
+      "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+    },
+    "AppS3Key": {
+      "Type": "String",
+      "Description": "S3 key for the springboot artifact",
+      "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+    },
+    "DBUser": {
+      "NoEcho": "true",
+      "Type": "String",
+      "Description": "Test database admin account name",
+      "MinLength": "1",
+      "MaxLength": "16",
+      "AllowedPattern": "[a-zA-Z][a-zA-Z0-9]*",
+      "ConstraintDescription": "must begin with a letter and contain only alphanumeric characters."
+    },
+    "DBPassword": {
+      "NoEcho": "true",
+      "Type": "String",
+      "Description": "Test database admin account password",
+      "MinLength": "8",
+      "MaxLength": "41",
+      "AllowedPattern": "[a-zA-Z0-9]*",
+      "ConstraintDescription": "must contain only alphanumeric characters."
+    },
+    "OperatorEMail": {
+      "Description": "EMail address to notify if there are any operational issues",
+      "Type": "String",
+      "AllowedPattern": "([a-zA-Z0-9_\\-\\.]+)@((\\[[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.)|(([a-zA-Z0-9\\-]+\\.)+))([a-zA-Z]{2,4}|[0-9]{1,3})(\\]?)",
+      "ConstraintDescription": "must be a valid email address."
+    }
+  },
+  "Mappings": {
+    "Region2Principal": {
+      "us-east-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "us-west-2": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "us-west-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "eu-west-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "eu-west-2": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "ap-southeast-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "ap-northeast-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "ap-northeast-2": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "ap-southeast-2": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "ap-south-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "us-east-2": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "ca-central-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "sa-east-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      },
+      "cn-north-1": {
+        "EC2Principal": "ec2.amazonaws.com.cn",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com.cn"
+      },
+      "eu-central-1": {
+        "EC2Principal": "ec2.amazonaws.com",
+        "OpsWorksPrincipal": "opsworks.amazonaws.com"
+      }
+    }
+  },
+  "Conditions": {
+    "Is-EC2-VPC": {
+      "Fn::Or": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            "eu-central-1"
+          ]
+        },
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "AWS::Region"
+            },
+            "cn-north-1"
+          ]
+        }
+      ]
+    },
+    "Is-EC2-Classic": {
+      "Fn::Not": [
+        {
+          "Condition": "Is-EC2-VPC"
+        }
+      ]
+    }
+  },
+  "Resources": {
+    "WebServerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  {
+                    "Fn::FindInMap": [
+                      "Region2Principal",
+                      {
+                        "Ref": "AWS::Region"
+                      },
+                      "EC2Principal"
+                    ]
+                  }
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path": "/"
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "8731fe52-becc-4dfd-92b1-583cd7f13fb3"
+        }
+      }
+    },
+    "WebServerRolePolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "WebServerRole",
+        "PolicyDocument": {
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "NotAction": "iam:*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "Roles": [
+          {
+            "Ref": "WebServerRole"
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "8cf116b3-33c8-42c2-8830-3ee8f594501c"
+        }
+      }
+    },
+    "WebServerInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "WebServerRole"
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "a07735d2-ba31-4ac3-8196-2d245d5f121a"
+        }
+      }
+    },
+    "MySpringBootApplication": {
+      "Type": "AWS::ElasticBeanstalk::Application",
+      "Properties": {
+        "Description": "AWS Elastic Beanstalk Sample Application"
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "fd8a9fce-095e-48ae-8d30-de8dc651e5d0"
+        }
+      }
+    },
+    "MySpringBootApplicationVersion": {
+      "Type": "AWS::ElasticBeanstalk::ApplicationVersion",
+      "Properties": {
+        "Description": "Version 1.0",
+        "ApplicationName": {
+          "Ref": "MySpringBootApplication"
+        },
+        "SourceBundle": {
+          "S3Bucket": {
+            "Fn::Join": [
+              "-",
+              [
+                "poc-sb-artifact"
+              ]
+            ]
+          },
+          "S3Key": { "Ref" : "AppS3Key" }
+        }
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "b9e91f26-e84f-4944-874f-b36b413c9797"
+        }
+      }
+    },
+    "MySpringBootConfigurationTemplate": {
+      "Type": "AWS::ElasticBeanstalk::ConfigurationTemplate",
+      "Properties": {
+        "ApplicationName": {
+          "Ref": "MySpringBootApplication"
+        },
+        "Description": "Default Configuration Version 1.0",
+        "SolutionStackName": "64bit Amazon Linux 2016.09 v2.4.4 running Java 8",
+        "OptionSettings": [
+          {
+            "Namespace": "aws:elasticbeanstalk:application:environment",
+            "OptionName": "PARAM1",
+            "Value": {
+              "Ref": "DBUser"
+            }
+          },
+          {
+            "Namespace": "aws:elasticbeanstalk:application:environment",
+            "OptionName": "PARAM2",
+            "Value": {
+              "Ref": "DBPassword"
+            }
+          },
+          {
+            "Namespace": "aws:autoscaling:launchconfiguration",
+            "OptionName": "SecurityGroups",
+            "Value": {
+              "Ref": "InstanceSecurityGroup"
+            }
+          },
+          {
+            "Namespace": "aws:autoscaling:launchconfiguration",
+            "OptionName": "IamInstanceProfile",
+            "Value": {
+              "Ref": "WebServerInstanceProfile"
+            }
+          }
+        ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "b6378a6e-e141-473d-b422-a29da5d49fa5"
+        }
+      }
+    },
+    "DevEnvironment": {
+      "Type": "AWS::ElasticBeanstalk::Environment",
+      "Properties": {
+        "Description": "AWS Elastic Beanstalk Environment running Sample Application",
+        "ApplicationName": {
+          "Ref": "MySpringBootApplication"
+        },
+        "TemplateName": {
+          "Ref": "MySpringBootConfigurationTemplate"
+        },
+        "VersionLabel": {
+          "Ref": "MySpringBootApplicationVersion"
+        },
+        "OptionSettings" : [ {
+                 "Namespace" : "aws:elasticbeanstalk:environment",
+                 "OptionName" : "ServiceRole",
+                 "Value" : "aws-elasticbeanstalk-service-role"
+              } ]
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "e6916d9d-dbfb-44d0-866d-8238162699dc"
+        }
+      }
+    },
+    "InstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "RDS allows ingress from EC2 instances in this group.",
+        "SecurityGroupIngress": []
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Designer": {
+          "id": "d0101a06-b50c-4071-ac38-8b547d2681b2"
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "URL": {
+      "Description": "URL of the AWS Elastic Beanstalk Environment",
+      "Value": {
+        "Fn::Join": [
+          "",
+          [
+            "http://",
+            {
+              "Fn::GetAtt": [
+                "DevEnvironment",
+                "EndpointURL"
+              ]
+            }
+          ]
+        ]
+      }
+    }
+  },
+  "Metadata": {
+    "AWS::CloudFormation::Designer": {
+      "d0101a06-b50c-4071-ac38-8b547d2681b2": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 450,
+          "y": 210
+        },
+        "z": 1,
+        "embeds": []
+      },
+      "fd8a9fce-095e-48ae-8d30-de8dc651e5d0": {
+        "size": {
+          "width": 330,
+          "height": 330
+        },
+        "position": {
+          "x": 60,
+          "y": 90
+        },
+        "z": 1,
+        "embeds": [
+          "b9e91f26-e84f-4944-874f-b36b413c9797",
+          "b6378a6e-e141-473d-b422-a29da5d49fa5",
+          "e6916d9d-dbfb-44d0-866d-8238162699dc"
+        ]
+      },
+      "b9e91f26-e84f-4944-874f-b36b413c9797": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 90,
+          "y": 150
+        },
+        "z": 2,
+        "parent": "fd8a9fce-095e-48ae-8d30-de8dc651e5d0",
+        "embeds": []
+      },
+      "8731fe52-becc-4dfd-92b1-583cd7f13fb3": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 300,
+          "y": 480
+        },
+        "z": 1,
+        "embeds": []
+      },
+      "a07735d2-ba31-4ac3-8196-2d245d5f121a": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 570,
+          "y": 90
+        },
+        "z": 1,
+        "embeds": [],
+        "isassociatedwith": [
+          "8731fe52-becc-4dfd-92b1-583cd7f13fb3"
+        ]
+      },
+      "b6378a6e-e141-473d-b422-a29da5d49fa5": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 210,
+          "y": 150
+        },
+        "z": 2,
+        "parent": "fd8a9fce-095e-48ae-8d30-de8dc651e5d0",
+        "embeds": [],
+        "isrelatedto": [
+          "f07e0c35-ad18-439f-b775-5350547ffaa2",
+          "d0101a06-b50c-4071-ac38-8b547d2681b2",
+          "a07735d2-ba31-4ac3-8196-2d245d5f121a"
+        ]
+      },
+      "e6916d9d-dbfb-44d0-866d-8238162699dc": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 90,
+          "y": 270
+        },
+        "z": 2,
+        "parent": "fd8a9fce-095e-48ae-8d30-de8dc651e5d0",
+        "embeds": [],
+        "isrelatedto": [
+          "b6378a6e-e141-473d-b422-a29da5d49fa5",
+          "b9e91f26-e84f-4944-874f-b36b413c9797"
+        ]
+      },
+      "8cf116b3-33c8-42c2-8830-3ee8f594501c": {
+        "size": {
+          "width": 60,
+          "height": 60
+        },
+        "position": {
+          "x": 570,
+          "y": 210
+        },
+        "z": 1,
+        "embeds": [],
+        "isassociatedwith": [
+          "8731fe52-becc-4dfd-92b1-583cd7f13fb3"
+        ]
+      }
+    }
+  }
+}

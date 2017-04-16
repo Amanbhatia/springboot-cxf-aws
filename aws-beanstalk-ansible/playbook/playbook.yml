@@ -1,0 +1,35 @@
+---
+- 
+  connection: local
+  gather_facts: false
+  hosts: localhost
+  tasks:
+    - name: Upload artifact to S3
+      s3:
+        region: ap-south-1
+        bucket: poc-sb-artifact
+        object: test-cxf-boot.jar
+        src: files/test-cxf-boot.jar
+        mode: put
+        overwrite: false
+      register: s3_output
+    - debug: msg={{ s3_output.url }}
+
+    - name: Launch infra using cloudformation template
+      cloudformation:
+        stack_name: "DemoSpringBootRestService"
+        state: "present"
+        region: "ap-south-1"
+        disable_rollback: true
+        template: "files/cf-springboot.json"
+        template_parameters:
+          AppS3Bucket: "poc-sb-artifact"
+          AppS3Key: "test-cxf-boot.jar"
+          DBUser: "someuser"
+          DBPassword: "somepassword"
+          OperatorEMail: "amansinghbhatia@gmail.com"
+        tags:
+          Stack: "Demo-SpringBoot"
+      register: URL
+
+    - debug: msg={{ URL }}
